@@ -80,3 +80,14 @@ export interface CustomerProfile {
 }
 
 export type Lang = 'uz' | 'ru' | 'en'
+
+/** Payload the Telegram Login Widget returns to the browser. */
+export interface TelegramAuthData {
+  id: number
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}

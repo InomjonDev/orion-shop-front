@@ -27,6 +27,7 @@ export default function CheckoutPage(): React.ReactElement {
   const { lines, subtotal, clear } = useCart()
 
   const [name, setName] = useState('')
+  const [phone, setPhone] = useState('+998 ')
   const [fulfillment, setFulfillment] = useState<FulfillmentType>('pickup')
   const [address, setAddress] = useState('')
   const [note, setNote] = useState('')
@@ -39,6 +40,7 @@ export default function CheckoutPage(): React.ReactElement {
       .then((b) => b.getCustomerProfile(user.uid))
       .then((p) => {
         if (p?.name) setName(p.name)
+        if (p?.phone) setPhone(p.phone)
         if (p?.address) setAddress(p.address)
       })
   }, [user])
@@ -51,6 +53,11 @@ export default function CheckoutPage(): React.ReactElement {
     }
     if (!name.trim()) {
       toast.error(t('checkout.nameReq'))
+      return
+    }
+    const normPhone = phone.replace(/\s+/g, '')
+    if (!/^\+?\d{9,15}$/.test(normPhone)) {
+      toast.error(t('checkout.phoneReq'))
       return
     }
     if (fulfillment === 'delivery' && !address.trim()) {
@@ -76,10 +83,10 @@ export default function CheckoutPage(): React.ReactElement {
         },
         paymentMethod: payment
       }
-      const order = await backend.createOrder(input, user.uid, user.phone)
+      const order = await backend.createOrder(input, user.uid, normPhone)
       await backend.saveCustomerProfile({
         uid: user.uid,
-        phone: user.phone,
+        phone: normPhone,
         name: name.trim(),
         address: fulfillment === 'delivery' ? address.trim() : null
       })
@@ -148,8 +155,15 @@ export default function CheckoutPage(): React.ReactElement {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>{t('checkout.phone')}</Label>
-                <Input value={user?.phone ?? ''} disabled />
+                <Label htmlFor="phone">{t('checkout.phone')}</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="+998 90 123 45 67"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
               </div>
             </CardContent>
           </Card>

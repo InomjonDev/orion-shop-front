@@ -1,44 +1,32 @@
 'use client'
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState
-} from 'react'
-import { isFirebaseConfigured } from './config'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import type { TelegramAuthData } from './types'
+import { isFirebaseConfigured, isTelegramConfigured } from './config'
 
 export interface ShopUser {
   uid: string
   phone: string
+  name: string
 }
 
 interface AuthCtx {
   user: ShopUser | null
   ready: boolean
-  isDemo: boolean
-  /** Begin phone verification. In Firebase mode this triggers an SMS. */
-  sendCode: (phone: string) => Promise<void>
-  /** Complete verification with the 6-digit code. */
-  verifyCode: (code: string) => Promise<void>
+  telegramEnabled: boolean
+  /** Sign in from a verified Telegram Login Widget payload. */
+  loginWithTelegram: (data: TelegramAuthData) => Promise<void>
+  /** Local-only fallback used when Telegram isn't configured (dev/preview). */
+  demoSignIn: (name?: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
 const Ctx = createContext<AuthCtx | null>(null)
-
 const USER_KEY = 'orion.shop.user'
-const RECAPTCHA_ID = 'recaptcha-container'
 
 export function AuthProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const [user, setUser] = useState<ShopUser | null>(null)
   const [ready, setReady] = useState(false)
-
-  // Firebase handles (typed loosely to avoid importing firebase in demo mode).
-  const confirmationRef = useRef<{ confirm: (code: string) => Promise<{ user: { uid: string; phoneNumber: string | null } }> } | null>(null)
-  const recaptchaRef = useRef<unknown>(null)
-  const pendingPhoneRef = useRef<string>('')
 
   // Restore session.
   useEffect(() => {
@@ -48,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         const { getFirebaseAuth } = await import('./firebase')
         const { onAuthStateChanged } = await import('firebase/auth')
         unsub = onAuthStateChanged(getFirebaseAuth(), (u) => {
-          setUser(u ? { uid: u.uid, phone: u.phoneNumber ?? '' } : null)
+          setUser(u ? { uid: u.uid, phone: u.phoneNumber ?? '', name: u.displayName ?? '' } : null)
           setReady(true)
         })
       } else {
@@ -64,66 +52,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return () => unsub?.()
   }, [])
 
-  const sendCode = useCallback(async (phone: string) => {
-    const clean = phone.trim()
-    pendingPhoneRef.current = clean
+  const loginWithTelegram = useCallback(async (data: TelegramAuthData) => {
+    const name = [data.first_name, data.last_name].filter(Boolean).join(' ')
     if (!isFirebaseConfigured) {
-      // Demo mode: no SMS, any 6 digits will verify.
-      return
-    }
-    const { getFirebaseAuth } = await import('./firebase')
-    const { RecaptchaVerifier, signInWithPhoneNumber } = await import('firebase/auth')
-    const auth = getFirebaseAuth()
-    if (!recaptchaRef.current) {
-      recaptchaRef.current = new RecaptchaVerifier(auth, RECAPTCHA_ID, { size: 'invisible' })
-    }
-    confirmationRef.current = (await signInWithPhoneNumber(
-      auth,
-      clean,
-      recaptchaRef.current as import('firebase/auth').RecaptchaVerifier
-    )) as unknown as typeof confirmationRef.current
-  }, [])
-
-  const verifyCode = useCallback(async (code: string) => {
-    if (!isFirebaseConfigured) {
-      const phone = pendingPhoneRef.current || '+000'
-      const demoUser: ShopUser = {
-        uid: 'demo-' + phone.replace(/\D/g, ''),
-        phone
-      }
+      const demo: ShopUser = { uid: 'tg_' + data.id, phone: '', name }
       try {
-        localStorage.setItem(USER_KEY, JSON.stringify(demoUser))
+        localStorage.setItem(USER_KEY, JSON.stringify(demo))
       } catch {
         /* ignore */
       }
-      setUser(demoUser)
+      setUser(demo)
       return
     }
-    if (!confirmationRef.current) throw new Error('No verification in progress.')
-    const cred = await confirmationRef.current.confirm(code)
-    setUser({ uid: cred.user.uid, phone: cred.user.phoneNumber ?? pendingPhoneRef.current })
+    // Exchange the signed Telegram payload for a Firebase custom token.
+    const res = await fetch('/api/telegram-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    const json = (await res.json()) as { token?: string; name?: string; error?: string }
+    if (!res.ok || !json.token) throw new Error(json.error || 'Telegram login failed.')
+
+    const { getFirebaseAuth } = await import('./firebase')
+    const { signInWithCustomToken, updateProfile } = await import('firebase/auth')
+    const cred = await signInWithCustomToken(getFirebaseAuth(), json.token)
+    const displayName = json.name || name
+    if (displayName && !cred.user.displayName) {
+      try {
+        await updateProfile(cred.user, { displayName })
+      } catch {
+        /* non-fatal */
+      }
+    }
+    setUser({ uid: cred.user.uid, phone: '', name: displayName })
+  }, [])
+
+  const demoSignIn = useCallback(async (name = 'Demo') => {
+    const demo: ShopUser = { uid: 'demo_' + Date.now().toString(36), phone: '', name }
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(demo))
+    } catch {
+      /* ignore */
+    }
+    setUser(demo)
   }, [])
 
   const signOut = useCallback(async () => {
     if (isFirebaseConfigured) {
       const { getFirebaseAuth } = await import('./firebase')
       const { signOut: fbSignOut } = await import('firebase/auth')
-      await fbSignOut(getFirebaseAuth())
-    } else {
       try {
-        localStorage.removeItem(USER_KEY)
+        await fbSignOut(getFirebaseAuth())
       } catch {
         /* ignore */
       }
-      setUser(null)
     }
+    try {
+      localStorage.removeItem(USER_KEY)
+    } catch {
+      /* ignore */
+    }
+    setUser(null)
   }, [])
 
   return (
-    <Ctx.Provider value={{ user, ready, isDemo: !isFirebaseConfigured, sendCode, verifyCode, signOut }}>
+    <Ctx.Provider
+      value={{
+        user,
+        ready,
+        telegramEnabled: isTelegramConfigured,
+        loginWithTelegram,
+        demoSignIn,
+        signOut
+      }}
+    >
       {children}
-      {/* Invisible reCAPTCHA mount point for Firebase Phone Auth. */}
-      <div id={RECAPTCHA_ID} />
     </Ctx.Provider>
   )
 }

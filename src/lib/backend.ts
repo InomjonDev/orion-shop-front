@@ -9,6 +9,7 @@ export interface Backend {
   createOrder(input: NewOrderInput, uid: string, phone: string): Promise<Order>
   listMyOrders(uid: string): Promise<Order[]>
   getOrder(id: string, uid: string): Promise<Order | null>
+  cancelOrder(id: string, uid: string): Promise<void>
   getCustomerProfile(uid: string): Promise<CustomerProfile | null>
   saveCustomerProfile(profile: CustomerProfile): Promise<void>
 }

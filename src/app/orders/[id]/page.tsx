@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle2, ChevronLeft, MapPin, Store, Truck, Wallet } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Order } from '@/lib/types'
 import { getBackend } from '@/lib/backend'
 import { useAuth } from '@/lib/auth'
@@ -22,6 +23,24 @@ function OrderInner(): React.ReactElement {
   const { t, lang } = useI18n()
   const { user, ready } = useAuth()
   const [order, setOrder] = useState<Order | null | undefined>(undefined)
+  const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+
+  async function handleCancel(): Promise<void> {
+    if (!user || !order) return
+    setCancelling(true)
+    try {
+      const b = await getBackend()
+      await b.cancelOrder(order.id, user.uid)
+      toast.success(t('order.cancelled'))
+      setOrder({ ...order, status: 'cancelled' })
+      setConfirming(false)
+    } catch (e) {
+      toast.error((e as Error).message)
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   useEffect(() => {
     if (!ready) return
@@ -141,6 +160,33 @@ function OrderInner(): React.ReactElement {
           </div>
         </CardContent>
       </Card>
+
+      {(order.status === 'new' || order.status === 'confirmed') &&
+        (confirming ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+            <span className="text-sm font-medium">{t('order.cancelConfirm')}</span>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="ml-auto"
+              disabled={cancelling}
+              onClick={handleCancel}
+            >
+              {t('order.cancel')}
+            </Button>
+            <Button size="sm" variant="outline" disabled={cancelling} onClick={() => setConfirming(false)}>
+              {t('order.keep')}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            className="mt-4 w-full text-destructive hover:text-destructive"
+            onClick={() => setConfirming(true)}
+          >
+            {t('order.cancel')}
+          </Button>
+        ))}
 
       <div className="mt-4 flex gap-2">
         <Button asChild variant="outline" className="flex-1">

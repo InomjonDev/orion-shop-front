@@ -1,7 +1,8 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { getBackend } from '@/lib/backend'
 import { useAuth } from '@/lib/auth'
 import { useI18n } from '@/lib/i18n'
 import { AuthPanel } from '@/components/AuthPanel'
@@ -15,9 +16,17 @@ function LoginInner(): React.ReactElement {
   const params = useSearchParams()
   const next = params.get('next') || '/'
 
-  useEffect(() => {
-    if (user) router.replace(next)
+  // After sign-in, first-time users (no name/phone yet) must complete their profile.
+  const routeAfterAuth = useCallback(async () => {
+    if (!user) return
+    const profile = await (await getBackend()).getCustomerProfile(user.uid)
+    const complete = Boolean(profile?.name && profile?.phone)
+    router.replace(complete ? next : '/profile?next=' + encodeURIComponent(next))
   }, [user, next, router])
+
+  useEffect(() => {
+    if (user) routeAfterAuth()
+  }, [user, routeAfterAuth])
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-14">
@@ -28,7 +37,8 @@ function LoginInner(): React.ReactElement {
           <p className="text-sm text-muted-foreground">{t('auth.subtitle')}</p>
         </CardHeader>
         <CardContent>
-          <AuthPanel onSignedIn={() => router.replace(next)} />
+          {/* Routing after sign-in is handled by the effect (profile-completeness gate). */}
+          <AuthPanel />
         </CardContent>
       </Card>
     </div>

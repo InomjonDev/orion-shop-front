@@ -7,6 +7,7 @@ import {
   where,
   orderBy,
   addDoc,
+  updateDoc,
   serverTimestamp,
   setDoc,
   Timestamp
@@ -130,6 +131,19 @@ export const firebaseBackend: Backend = {
     if (!snap.exists()) return null
     const order = mapOrder(snap.id, snap.data())
     return order.uid === uid ? order : null
+  },
+
+  async cancelOrder(id, uid) {
+    const db = getDb()
+    const ref = doc(db, 'orders', id)
+    const snap = await getDoc(ref)
+    if (!snap.exists()) throw new Error('Order not found.')
+    const o = mapOrder(snap.id, snap.data())
+    if (o.uid !== uid) throw new Error('Not your order.')
+    if (o.status !== 'new' && o.status !== 'confirmed') {
+      throw new Error('This order can no longer be cancelled.')
+    }
+    await updateDoc(ref, { status: 'cancelled' })
   },
 
   async getCustomerProfile(uid) {

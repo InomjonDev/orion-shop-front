@@ -105,6 +105,17 @@ export const mockBackend: Backend = {
     await delay(150)
     return readOrders().find((o) => o.id === id && o.uid === uid) ?? null
   },
+  async cancelOrder(id, uid) {
+    await delay(200)
+    const list = readOrders()
+    const o = list.find((x) => x.id === id && x.uid === uid)
+    if (!o) throw new Error('Order not found.')
+    if (o.status !== 'new' && o.status !== 'confirmed') {
+      throw new Error('This order can no longer be cancelled.')
+    }
+    o.status = 'cancelled'
+    writeOrders(list)
+  },
   async getCustomerProfile(uid) {
     try {
       const raw = localStorage.getItem(PROFILE_KEY)

@@ -26,3 +26,8 @@ export const shopEnv = {
   address: process.env.NEXT_PUBLIC_SHOP_ADDRESS || null,
   cloudinaryCloud: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || null
 }
+
+// Telegram login. When a bot username is set, the storefront shows the
+// "Log in with Telegram" widget instead of the (paid) SMS flow.
+export const telegramBotUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ''
+export const isTelegramConfigured = Boolean(telegramBotUsername)
