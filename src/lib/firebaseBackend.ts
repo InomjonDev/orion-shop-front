@@ -154,17 +154,19 @@ export const firebaseBackend: Backend = {
     return {
       uid,
       phone: (d.phone as string) ?? '',
+      phoneVerified: d.phoneVerified === true,
       name: (d.name as string) ?? null,
       address: (d.address as string) ?? null
     }
   },
 
   async saveCustomerProfile(profile) {
+    // Only name/address — the verified phone is written by the server and the
+    // security rules reject any client attempt to touch phone fields.
     const db = getDb()
     await setDoc(
       doc(db, 'customers', profile.uid),
       {
-        phone: profile.phone,
         name: profile.name,
         address: profile.address,
         updatedAt: serverTimestamp()

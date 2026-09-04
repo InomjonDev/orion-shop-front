@@ -20,7 +20,7 @@ function LoginInner(): React.ReactElement {
   const routeAfterAuth = useCallback(async () => {
     if (!user) return
     const profile = await (await getBackend()).getCustomerProfile(user.uid)
-    const complete = Boolean(profile?.name && profile?.phone)
+    const complete = Boolean(profile?.name && profile?.phoneVerified)
     router.replace(complete ? next : '/profile?next=' + encodeURIComponent(next))
   }, [user, next, router])
 

@@ -121,14 +121,40 @@ export const mockBackend: Backend = {
       const raw = localStorage.getItem(PROFILE_KEY)
       if (!raw) return null
       const p = JSON.parse(raw) as CustomerProfile
-      return p.uid === uid ? p : null
+      return p.uid === uid ? { ...p, phoneVerified: p.phoneVerified === true } : null
     } catch {
       return null
     }
   },
   async saveCustomerProfile(profile) {
+    // Merge so a previously verified phone survives a name/address edit.
     try {
-      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
+      const raw = localStorage.getItem(PROFILE_KEY)
+      const prev = raw ? (JSON.parse(raw) as CustomerProfile) : null
+      const next: CustomerProfile = {
+        uid: profile.uid,
+        phone: prev?.uid === profile.uid ? prev.phone : '',
+        phoneVerified: prev?.uid === profile.uid ? prev.phoneVerified : false,
+        name: profile.name,
+        address: profile.address
+      }
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+  },
+  async setVerifiedPhoneForTest(uid, phone) {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY)
+      const prev = raw ? (JSON.parse(raw) as CustomerProfile) : null
+      const next: CustomerProfile = {
+        uid,
+        phone,
+        phoneVerified: true,
+        name: prev?.uid === uid ? prev.name : null,
+        address: prev?.uid === uid ? prev.address : null
+      }
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(next))
     } catch {
       /* ignore */
     }

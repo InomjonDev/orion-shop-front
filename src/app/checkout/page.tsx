@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Store, Truck, Wallet, ShoppingBag, LogIn } from 'lucide-react'
+import { CreditCard, Store, Truck, Wallet, ShoppingBag, LogIn, BadgeCheck, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import type { FulfillmentType, NewOrderInput, PaymentMethod } from '@/lib/types'
 import { getBackend } from '@/lib/backend'
@@ -27,7 +27,8 @@ export default function CheckoutPage(): React.ReactElement {
   const { lines, subtotal, clear } = useCart()
 
   const [name, setName] = useState('')
-  const [phone, setPhone] = useState('+998 ')
+  const [phone, setPhone] = useState('')
+  const [phoneVerified, setPhoneVerified] = useState(false)
   const [fulfillment, setFulfillment] = useState<FulfillmentType>('pickup')
   const [address, setAddress] = useState('')
   const [note, setNote] = useState('')
@@ -40,7 +41,8 @@ export default function CheckoutPage(): React.ReactElement {
       .then((b) => b.getCustomerProfile(user.uid))
       .then((p) => {
         if (p?.name) setName(p.name)
-        if (p?.phone) setPhone(p.phone)
+        setPhone(p?.phone ?? '')
+        setPhoneVerified(Boolean(p?.phoneVerified))
         if (p?.address) setAddress(p.address)
       })
   }, [user])
@@ -55,9 +57,9 @@ export default function CheckoutPage(): React.ReactElement {
       toast.error(t('checkout.nameReq'))
       return
     }
-    const normPhone = phone.replace(/\s+/g, '')
-    if (!/^\+?\d{9,15}$/.test(normPhone)) {
-      toast.error(t('checkout.phoneReq'))
+    if (!phoneVerified || !phone) {
+      toast.error(t('checkout.verifyPhoneReq'))
+      router.push('/profile?next=' + encodeURIComponent('/checkout'))
       return
     }
     if (fulfillment === 'delivery' && !address.trim()) {
@@ -83,10 +85,9 @@ export default function CheckoutPage(): React.ReactElement {
         },
         paymentMethod: payment
       }
-      const order = await backend.createOrder(input, user.uid, normPhone)
+      const order = await backend.createOrder(input, user.uid, phone)
       await backend.saveCustomerProfile({
         uid: user.uid,
-        phone: normPhone,
         name: name.trim(),
         address: fulfillment === 'delivery' ? address.trim() : null
       })
@@ -155,15 +156,26 @@ export default function CheckoutPage(): React.ReactElement {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="phone">{t('checkout.phone')}</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="+998 90 123 45 67"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+                <Label>{t('checkout.phone')}</Label>
+                {phoneVerified && phone ? (
+                  <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm">
+                    <BadgeCheck className="size-4 shrink-0 text-primary" />
+                    <span className="font-medium tabular-nums">{phone}</span>
+                    <span className="ml-auto text-xs text-primary">{t('profile.phoneVerified')}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-md border border-dashed border-amber-500/50 bg-amber-500/5 px-3 py-2.5 text-sm">
+                    <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                    <div className="flex-1">
+                      <p className="text-muted-foreground">{t('checkout.phoneUnverified')}</p>
+                      <Button asChild variant="link" className="h-auto p-0 text-primary">
+                        <Link href={'/profile?next=' + encodeURIComponent('/checkout')}>
+                          {t('checkout.verifyNow')}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -265,7 +277,12 @@ export default function CheckoutPage(): React.ReactElement {
                   {formatMoney(subtotal)}
                 </span>
               </div>
-              <Button className="mt-4 w-full" size="lg" disabled={placing} onClick={placeOrder}>
+              <Button
+                className="mt-4 w-full"
+                size="lg"
+                disabled={placing || !phoneVerified}
+                onClick={placeOrder}
+              >
                 {placing ? t('checkout.placing') : t('checkout.place')}
               </Button>
             </CardContent>

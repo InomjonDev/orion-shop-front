@@ -75,6 +75,8 @@ export interface NewOrderInput {
 export interface CustomerProfile {
   uid: string
   phone: string
+  /** True only once the phone was verified through Telegram (server-written). */
+  phoneVerified: boolean
   name: string | null
   address: string | null
 }

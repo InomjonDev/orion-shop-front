@@ -11,7 +11,12 @@ export interface Backend {
   getOrder(id: string, uid: string): Promise<Order | null>
   cancelOrder(id: string, uid: string): Promise<void>
   getCustomerProfile(uid: string): Promise<CustomerProfile | null>
-  saveCustomerProfile(profile: CustomerProfile): Promise<void>
+  /** Saves only fields the customer owns. The phone is set by the server (via
+   *  Telegram verification) and can never be written from the client. */
+  saveCustomerProfile(profile: { uid: string; name: string | null; address: string | null }): Promise<void>
+  /** Local/offline only: mark a typed phone as verified so the flow can be
+   *  exercised without a real Telegram round-trip. Absent on the real backend. */
+  setVerifiedPhoneForTest?(uid: string, phone: string): Promise<void>
 }
 
 let cached: Backend | null = null

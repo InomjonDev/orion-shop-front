@@ -1,29 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyTelegramAuth, type TelegramAuthData } from '@/lib/telegram'
+import { getAdminAuth, adminConfigured } from '@/lib/adminApp'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 // firebase-admin needs the Node runtime (not Edge).
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Cache the admin Auth instance across warm invocations.
-let adminAuthPromise: Promise<import('firebase-admin/auth').Auth> | null = null
-async function getAdminAuth(): Promise<import('firebase-admin/auth').Auth> {
-  if (!adminAuthPromise) {
-    adminAuthPromise = (async () => {
-      const { initializeApp, getApps, cert } = await import('firebase-admin/app')
-      const { getAuth } = await import('firebase-admin/auth')
-      const sa = JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT || '{}')
-      const app = getApps().length ? getApps()[0] : initializeApp({ credential: cert(sa) })
-      return getAuth(app)
-    })()
-  }
-  return adminAuthPromise
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const limited = await checkRateLimit(req, 'telegram-auth', { limit: 20, windowMs: 60_000 })
+  if (limited) return limited
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN
-  if (!botToken || !process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT) {
-    return NextResponse.json({ error: 'Telegram login is not configured on the server.' }, { status: 503 })
+  if (!botToken || !adminConfigured()) {
+    return NextResponse.json(
+      { error: 'Telegram login is not configured on the server.' },
+      { status: 503 }
+    )
   }
 
   let data: TelegramAuthData
