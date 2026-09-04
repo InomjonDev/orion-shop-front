@@ -144,7 +144,7 @@ const en: Dict = {
   'auth.invalidPhone': 'Enter a valid phone number.',
   'auth.invalidCode': 'Enter the 6-digit code.',
   'auth.failed': 'Could not verify the code. Try again.',
-  'auth.demoNote': 'Demo mode: enter any 6 digits to sign in.',
+  'auth.demoNote': 'Guest sign-in for local preview. Orders you place stay on this device.',
 
   'footer.contact': 'Contact',
   'footer.builtWith': 'Online shop for'
@@ -283,7 +283,7 @@ const ru: Dict = {
   'auth.invalidPhone': 'Введите корректный номер.',
   'auth.invalidCode': 'Введите 6-значный код.',
   'auth.failed': 'Не удалось проверить код. Попробуйте снова.',
-  'auth.demoNote': 'Демо-режим: введите любые 6 цифр для входа.',
+  'auth.demoNote': 'Гостевой вход для локального просмотра. Ваши заказы останутся на этом устройстве.',
 
   'footer.contact': 'Контакты',
   'footer.builtWith': 'Интернет-магазин'
@@ -422,7 +422,7 @@ const uz: Dict = {
   'auth.invalidPhone': 'To‘g‘ri telefon raqamini kiriting.',
   'auth.invalidCode': '6 xonali kodni kiriting.',
   'auth.failed': 'Kodni tasdiqlab bo‘lmadi. Qayta urining.',
-  'auth.demoNote': 'Demo rejim: kirish uchun istalgan 6 raqamni kiriting.',
+  'auth.demoNote': 'Mahalliy koʻrish uchun mehmon kirishi. Buyurtmalaringiz shu qurilmada saqlanadi.',
 
   'footer.contact': 'Aloqa',
   'footer.builtWith': 'Onlayn do‘kon'

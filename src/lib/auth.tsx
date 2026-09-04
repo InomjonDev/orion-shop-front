@@ -36,7 +36,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         const { getFirebaseAuth } = await import('./firebase')
         const { onAuthStateChanged } = await import('firebase/auth')
         unsub = onAuthStateChanged(getFirebaseAuth(), (u) => {
-          setUser(u ? { uid: u.uid, phone: u.phoneNumber ?? '', name: u.displayName ?? '' } : null)
+          if (u) {
+            setUser({ uid: u.uid, phone: u.phoneNumber ?? '', name: u.displayName ?? '' })
+          } else {
+            // No Firebase session. In local/guest mode a demo user may be stored;
+            // restore it so the guest login survives a page reload. (In production
+            // nothing writes this key, so signed-out users stay signed out.)
+            try {
+              const raw = localStorage.getItem(USER_KEY)
+              setUser(raw ? (JSON.parse(raw) as ShopUser) : null)
+            } catch {
+              setUser(null)
+            }
+          }
           setReady(true)
         })
       } else {

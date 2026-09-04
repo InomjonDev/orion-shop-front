@@ -1,5 +1,5 @@
 import type { CatalogProduct, ShopConfig, Order, NewOrderInput, CustomerProfile } from './types'
-import { isFirebaseConfigured } from './config'
+import { isFirebaseConfigured, isTelegramConfigured } from './config'
 
 /** Data operations the storefront performs. Auth lives separately in auth.tsx. */
 export interface Backend {
@@ -16,11 +16,20 @@ export interface Backend {
 
 let cached: Backend | null = null
 
-/** Returns the Firebase-backed implementation when configured, else the mock. */
+/**
+ * Picks the data layer:
+ * - Firebase + a login provider (production) → full Firebase backend.
+ * - Firebase but no login provider (local `next dev`) → real catalog from
+ *   Firestore, but the signed-in user's private data kept in the browser, so the
+ *   shop works with the guest login and no permission errors.
+ * - No Firebase at all → fully offline mock.
+ */
 export async function getBackend(): Promise<Backend> {
   if (cached) return cached
-  if (isFirebaseConfigured) {
+  if (isFirebaseConfigured && isTelegramConfigured) {
     cached = (await import('./firebaseBackend')).firebaseBackend
+  } else if (isFirebaseConfigured) {
+    cached = (await import('./guestBackend')).guestBackend
   } else {
     cached = (await import('./mockBackend')).mockBackend
   }
